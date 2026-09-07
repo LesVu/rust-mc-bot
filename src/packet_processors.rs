@@ -42,11 +42,11 @@ pub fn lookup_packet(state: ProtocolState, packet: u8) -> Option<PacketHandler> 
 
         ProtocolState::Play => match packet {
             0x15 => return Some(config::process_cookie_request_packet),
-            0x26 => return Some(play::process_keep_alive_packet),
-            0x2B => return Some(play::process_join_game),
-            0x1C => return Some(play::process_kick),
-            0x41 => return Some(play::process_teleport),
-            0x7A => return Some(config::process_transfer),
+            0x20 => return Some(play::process_kick),
+            0x2C => return Some(play::process_keep_alive_packet),
+            0x31 => return Some(play::process_join_game),
+            0x48 => return Some(play::process_teleport),
+            0x81 => return Some(config::process_transfer),
             _ => {}
         },
     }

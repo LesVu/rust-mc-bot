@@ -55,7 +55,7 @@ pub fn process_teleport(buffer: &mut Buf, bot: &mut Bot, compression: &mut Compr
 pub fn write_chat_message(message: &str) -> Buf {
     // ClientChatMessagePacket
     let mut buf = Buf::new();
-    buf.write_packet_id(0x08);
+    buf.write_packet_id(0x09);
 
     buf.write_sized_str(message);
 
@@ -75,7 +75,7 @@ pub fn write_chat_message(message: &str) -> Buf {
 pub fn write_animation(off_hand: bool) -> Buf {
     // ClientAnimationPacket
     let mut buf = Buf::new();
-    buf.write_packet_id(0x3C);
+    buf.write_packet_id(0x3F);
     buf.write_var_u32(if off_hand { 1 } else { 0 });
 
     buf
@@ -86,7 +86,7 @@ pub fn write_animation(off_hand: bool) -> Buf {
 pub fn write_entity_action(entity_id: u32, action_id: u32, jump_boost: u32) -> Buf {
     // ClientEntityActionPacket
     let mut buf = Buf::new();
-    buf.write_packet_id(0x29);
+    buf.write_packet_id(0x2A);
 
     buf.write_var_u32(entity_id);
     buf.write_var_u32(action_id);
@@ -100,7 +100,7 @@ pub fn write_entity_action(entity_id: u32, action_id: u32, jump_boost: u32) -> B
 pub fn write_held_slot(slot: u16) -> Buf {
     // ClientHeldItemChangePacket
     let mut buf = Buf::new();
-    buf.write_packet_id(0x34);
+    buf.write_packet_id(0x35);
 
     buf.write_u16(slot);
 
@@ -124,7 +124,7 @@ pub fn write_tele_confirm(id: u32) -> Buf {
 pub fn write_keep_alive_packet(id: u64) -> Buf {
     // ClientKeepAlivePacket
     let mut buf = Buf::new();
-    buf.write_packet_id(0x1b);
+    buf.write_packet_id(0x1C);
 
     buf.write_u64(id);
 
@@ -140,7 +140,7 @@ pub fn write_current_pos(bot: &Bot) -> Buf {
 pub fn write_pos(x: f64, y: f64, z: f64, yaw: f32, pitch: f32) -> Buf {
     // ClientPlayerPositionAndRotationPacket
     let mut buf = Buf::new();
-    buf.write_packet_id(0x1E);
+    buf.write_packet_id(0x1F);
 
     buf.write_f64(x);
     buf.write_f64(y);
