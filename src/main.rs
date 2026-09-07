@@ -1,25 +1,23 @@
-mod net;
+mod nets;
 mod packet_processors;
 mod packet_utils;
 mod states;
 
+use crate::nets::stream::Stream;
 use crate::packet_utils::Buf;
 use crate::states::login;
 use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use mio::net::TcpStream;
-use mio::{event, Events, Interest, Poll, Registry, Token};
+use mio::{Events, Interest, Poll, Token};
 use rand::prelude::*;
 use states::play;
 use std::collections::HashMap;
+
 use std::io;
-use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use std::{env, net::ToSocketAddrs};
 use uuid::Uuid;
-
-#[cfg(unix)]
-use {mio::net::UnixStream, std::path::PathBuf};
 
 // This rate limits the join rate of the bots
 // Increasing it will cause the bots to join more quickly
@@ -28,8 +26,6 @@ const AVG_JOINS_PER_TICK: f64 = 5.0;
 const SHOULD_MOVE: bool = true;
 const MESSAGES: &[&str] = &["This is a chat message!", "Wow", "Server = on?"];
 
-#[cfg(unix)]
-const UDS_PREFIX: &str = "unix://";
 const PROTOCOL_VERSION: u32 = 772;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -39,13 +35,8 @@ fn main() -> io::Result<()> {
 
     if args.len() < 3 {
         let name = args.get(0).unwrap();
-        #[cfg(unix)]
-        println!("usage: {} <ip:port or path> <count> [threads]", name);
-        #[cfg(not(unix))]
         println!("usage: {} <ip:port> <count> [threads]", name);
         println!("example: {} localhost:25565 500", name);
-        #[cfg(unix)]
-        println!("example: {} unix:///path/to/socket 500", name);
         return Ok(());
     }
 
@@ -54,11 +45,6 @@ fn main() -> io::Result<()> {
     let arg3 = args.get(3);
 
     let mut addrs = None;
-
-    #[cfg(unix)]
-    if let Some(unix_socket) = arg1.strip_prefix(UDS_PREFIX) {
-        addrs = Some(Address::UNIX(PathBuf::from(unix_socket.to_owned())));
-    }
 
     if addrs.is_none() {
         let mut parts = arg1.split(':');
@@ -74,7 +60,7 @@ fn main() -> io::Result<()> {
             .next()
             .expect("No socket address found");
 
-        addrs = Some(Address::TCP(server));
+        addrs = Some(Address::new(server));
     }
 
     // Cant be none because it would have panicked earlier
@@ -248,7 +234,7 @@ pub fn start_bots(count: u32, addrs: Address, name_offset: u32, cpus: u32) {
                     start_bot(bot, &mut compression);
                 }
                 if event.is_readable() && bot.joined {
-                    net::process_packet(
+                    nets::net::process_packet(
                         bot,
                         &mut packet_buf,
                         &mut uncompressed_buf,
@@ -346,103 +332,13 @@ pub fn start_bots(count: u32, addrs: Address, name_offset: u32, cpus: u32) {
 }
 
 #[derive(Clone, Debug)]
-pub enum Address {
-    #[cfg(unix)]
-    UNIX(PathBuf),
-    TCP(SocketAddr),
-}
+pub struct Address(SocketAddr);
 
 impl Address {
+    pub fn new(addr: SocketAddr) -> Self {
+        Self(addr)
+    }
     pub fn connect(&self) -> Stream {
-        match self {
-            #[cfg(unix)]
-            Address::UNIX(path) => {
-                Stream::UNIX(UnixStream::connect(path).expect("Could not connect to the server"))
-            }
-            Address::TCP(address) => Stream::TCP(
-                TcpStream::connect(address.to_owned()).expect("Could not connect to the server"),
-            ),
-        }
-    }
-}
-
-pub enum Stream {
-    #[cfg(unix)]
-    UNIX(UnixStream),
-    TCP(TcpStream),
-}
-
-impl Stream {
-    pub fn set_ops(&mut self) {
-        match self {
-            Stream::TCP(s) => {
-                s.set_nodelay(true).unwrap();
-            }
-            _ => {}
-        }
-    }
-}
-
-impl Read for Stream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            #[cfg(unix)]
-            Stream::UNIX(s) => s.read(buf),
-            Stream::TCP(s) => s.read(buf),
-        }
-    }
-}
-
-impl Write for Stream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            #[cfg(unix)]
-            Stream::UNIX(s) => s.write(buf),
-            Stream::TCP(s) => s.write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            #[cfg(unix)]
-            Stream::UNIX(s) => s.flush(),
-            Stream::TCP(s) => s.flush(),
-        }
-    }
-}
-
-impl event::Source for Stream {
-    fn register(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        match self {
-            #[cfg(unix)]
-            Stream::UNIX(s) => s.register(registry, token, interests),
-            Stream::TCP(s) => s.register(registry, token, interests),
-        }
-    }
-
-    fn reregister(
-        &mut self,
-        registry: &Registry,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        match self {
-            #[cfg(unix)]
-            Stream::UNIX(s) => s.reregister(registry, token, interests),
-            Stream::TCP(s) => s.reregister(registry, token, interests),
-        }
-    }
-
-    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
-        match self {
-            #[cfg(unix)]
-            Stream::UNIX(s) => s.deregister(registry),
-            Stream::TCP(s) => s.deregister(registry),
-        }
+        Stream::new(TcpStream::connect(self.0.to_owned()).expect("Could not connect to the server"))
     }
 }
