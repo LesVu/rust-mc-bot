@@ -1,6 +1,6 @@
 use std::convert::TryInto;
-use std::intrinsics::copy_nonoverlapping;
 use std::io::Write;
+use std::ptr::copy_nonoverlapping;
 use std::{io, mem};
 
 pub struct Buf {
@@ -78,16 +78,18 @@ impl Buf {
         if extra_len > 0 {
             dst.reserve(extra_len as usize);
         }
-        let dst_ptr = dst.as_mut_ptr().offset(self.write_index as isize);
-        let src_ptr = other.offset(start as isize);
-        if Self::is_nonoverlapping(src_ptr, dst_ptr, len - start as usize) {
-            copy_nonoverlapping(src_ptr, dst_ptr, len - start as usize);
-        } else {
-            panic!("copy is overlapping")
-        }
+        unsafe {
+            let dst_ptr = dst.as_mut_ptr().offset(self.write_index as isize);
+            let src_ptr = other.offset(start as isize);
+            if Self::is_nonoverlapping(src_ptr, dst_ptr, len - start as usize) {
+                copy_nonoverlapping(src_ptr, dst_ptr, len - start as usize);
+            } else {
+                panic!("copy is overlapping")
+            }
 
-        if extra_len > 0 {
-            dst.set_len(needed_len as usize);
+            if extra_len > 0 {
+                dst.set_len(needed_len as usize);
+            }
         }
         self.advance_writer(len as u32);
     }
