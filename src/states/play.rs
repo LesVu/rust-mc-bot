@@ -95,6 +95,17 @@ pub fn write_entity_action(entity_id: u32, action_id: u32, jump_boost: u32) -> B
     buf
 }
 
+/// Player Input (serverbound)
+/// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Player_Input
+pub fn write_player_input(flags: u8) -> Buf {
+    // ClientPlayerInputPacket
+    let mut buf = Buf::new();
+    buf.write_packet_id(0x2B);
+
+    buf.write_u8(flags);
+    buf
+}
+
 /// Set Held Item (serverbound)
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Set_Held_Item_(serverbound)
 pub fn write_held_slot(slot: u16) -> Buf {

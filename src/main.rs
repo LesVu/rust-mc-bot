@@ -174,15 +174,22 @@ pub fn start_bot(addrs: Address, name: String) {
 
         // Ticking actions
         if SHOULD_MOVE && bot.teleported {
-            bot.x += rand::random::<f64>() * 1.0 - 0.5;
-            bot.z += rand::random::<f64>() * 1.0 - 0.5;
-            bot.send_packet(play::write_current_pos(&bot), &mut compression);
+            // bot.x += rand::random::<f64>() * 1.0 - 0.5;
+            // bot.z += rand::random::<f64>() * 1.0 - 0.5;
+            // bot.send_packet(play::write_current_pos(&bot), &mut compression);
 
-            // Sneak
-            bot.send_packet(
-                play::write_entity_action(bot.entity_id, if rand::random() { 1 } else { 0 }, 0),
-                &mut compression,
-            );
+            // Sneak (0x20 = Shift / Sneak flag)
+            bot.send_packet(play::write_player_input(0x20), &mut compression);
+            println!("Sneaking");
+
+            // Hold for 1 second
+            std::thread::sleep(Duration::from_secs(2));
+
+            // Unsneak (clear sneak flag)
+            bot.send_packet(play::write_player_input(0x00), &mut compression);
+            println!("Un Sneak");
+            // Hold for 1 second
+            std::thread::sleep(Duration::from_secs(2));
         }
 
         let elapsed = ins.elapsed();
