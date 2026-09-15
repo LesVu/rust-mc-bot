@@ -58,7 +58,7 @@ pub fn process_decode(
     bot: &mut Bot,
     compression: &mut Compression,
 ) -> Option<()> {
-    let packet_id = buffer.read_var_u32().0 as u8;
+    let packet_id = buffer.read_var_i32() as u8;
     (lookup_packet(bot.state, packet_id)?)(buffer, bot, compression);
     Some(())
 }
@@ -71,7 +71,7 @@ impl PacketFramer {
             panic!("header_size > 3")
         }
         let mut target = Buf::with_length(size + header_size);
-        target.write_var_u32(size);
+        target.write_var_i32(size as i32);
         target.append(&buffer, buffer.get_writer_index() as usize);
         target
     }
@@ -89,7 +89,7 @@ impl PacketCompressor {
             Ok(buf)
         } else {
             let mut buf = Buf::new();
-            buf.write_var_u32(0);
+            buf.write_var_i32(0);
             buf.append(&buffer, buffer.get_writer_index() as usize);
             Ok(buf)
         }
@@ -101,7 +101,7 @@ pub fn compress_packet(
     compressor: &mut Compressor,
     compression_buffer: &mut Buf,
 ) -> Result<(), Error> {
-    compression_buffer.write_var_u32(packet.get_writer_index());
+    compression_buffer.write_var_i32(packet.get_writer_index() as i32);
     compression_buffer
         .ensure_writable(compressor.zlib_compress_bound(packet.get_writer_index() as usize) as u32);
 

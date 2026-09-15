@@ -1,22 +1,22 @@
-use crate::{packet_utils::Buf, states::config};
 use crate::{Bot, Compression, ProtocolState};
+use crate::{packet_utils::Buf, states::config};
 
 //c2s
 
 /// Handshake
 pub fn write_handshake_packet(
-    protocol_version: u32,
+    protocol_version: i32,
     server_address: String,
     server_port: u16,
-    next_state: u32,
+    next_state: i32,
 ) -> Buf {
     let mut buf = Buf::new();
     buf.write_packet_id(0x00);
 
-    buf.write_var_u32(protocol_version);
+    buf.write_var_i32(protocol_version);
     buf.write_sized_str(&server_address);
     buf.write_u16(server_port);
-    buf.write_var_u32(next_state);
+    buf.write_var_i32(next_state);
 
     buf
 }
@@ -32,11 +32,11 @@ pub fn write_login_start_packet(username: &str, uuid: u128) -> Buf {
     buf
 }
 
-pub fn write_plugin_message_response(message: u32) -> Buf {
+pub fn write_plugin_message_response(message: i32) -> Buf {
     let mut buf = Buf::new();
     buf.write_packet_id(0x02);
 
-    buf.write_var_u32(message);
+    buf.write_var_i32(message);
     buf.write_bool(false);
 
     buf
@@ -74,14 +74,10 @@ pub fn process_encryption_request_packet(
 /// Login Success
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Login_Success
 pub fn process_login_success_packet(
-    buffer: &mut Buf,
+    _buffer: &mut Buf,
     bot: &mut Bot,
     compression: &mut Compression,
 ) {
-    let _uuid = buffer.read_u128();
-    let _name = buffer.read_sized_string();
-    let _properties = buffer.read_var_u32();
-
     bot.state = ProtocolState::Config;
 
     bot.send_packet(write_login_acknowledged(), compression);
@@ -95,12 +91,12 @@ pub fn process_set_compression_packet(
     bot: &mut Bot,
     _compression: &mut Compression,
 ) {
-    bot.compression_threshold = buf.read_var_u32().0 as i32;
+    bot.compression_threshold = buf.read_var_i32();
 }
 
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Login_Plugin_Request
 pub fn process_plugin_message_request(buf: &mut Buf, bot: &mut Bot, compression: &mut Compression) {
-    let identifier = buf.read_var_u32().0;
+    let identifier = buf.read_var_i32();
     bot.send_packet(write_plugin_message_response(identifier), compression);
 }
 

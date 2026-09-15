@@ -23,7 +23,7 @@ pub fn process_join_game(buffer: &mut Buf, bot: &mut Bot, _compression: &mut Com
 /// Synchronize Player Position
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Synchronize_Player_Position
 pub fn process_teleport(buffer: &mut Buf, bot: &mut Bot, compression: &mut Compression) {
-    let id = buffer.read_var_u32().0;
+    let id = buffer.read_var_i32();
     let x = buffer.read_f64();
     let y = buffer.read_f64();
     let z = buffer.read_f64();
@@ -63,9 +63,9 @@ pub fn write_chat_message(message: &str) -> Buf {
     buf.write_u64(0); // timestamp
     buf.write_u64(0); // salt
     buf.write_bool(false); // has signature
-    buf.write_var_u32(0); // count
+    buf.write_var_i32(0); // count
     buf.write_bytes(&[0; 3]); // bitset
-    buf.write_var_u32(0); // signature count
+    buf.write_var_i32(0); // signature count
 
     buf
 }
@@ -76,21 +76,21 @@ pub fn write_animation(off_hand: bool) -> Buf {
     // ClientAnimationPacket
     let mut buf = Buf::new();
     buf.write_packet_id(0x3F);
-    buf.write_var_u32(if off_hand { 1 } else { 0 });
+    buf.write_var_i32(if off_hand { 1 } else { 0 });
 
     buf
 }
 
 /// Player Action (serverbound)
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Player_Command
-pub fn write_entity_action(entity_id: u32, action_id: u32, jump_boost: u32) -> Buf {
+pub fn write_entity_action(entity_id: i32, action_id: i32, jump_boost: i32) -> Buf {
     // ClientEntityActionPacket
     let mut buf = Buf::new();
     buf.write_packet_id(0x2A);
 
-    buf.write_var_u32(entity_id);
-    buf.write_var_u32(action_id);
-    buf.write_var_u32(jump_boost);
+    buf.write_var_i32(entity_id);
+    buf.write_var_i32(action_id);
+    buf.write_var_i32(jump_boost);
 
     buf
 }
@@ -102,7 +102,7 @@ pub fn write_player_input(flags: u8) -> Buf {
     let mut buf = Buf::new();
     buf.write_packet_id(0x2B);
 
-    buf.write_u8(flags);
+    buf.write_byte(flags);
     buf
 }
 
@@ -120,12 +120,12 @@ pub fn write_held_slot(slot: u16) -> Buf {
 
 /// Confirm Teleportation
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Confirm_Teleportation
-pub fn write_tele_confirm(id: u32) -> Buf {
+pub fn write_tele_confirm(id: i32) -> Buf {
     // ClientTeleportConfirmPacket
     let mut buf = Buf::new();
     buf.write_packet_id(0x00);
 
-    buf.write_var_u32(id);
+    buf.write_var_i32(id);
 
     buf
 }

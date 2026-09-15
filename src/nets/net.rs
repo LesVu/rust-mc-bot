@@ -1,5 +1,5 @@
 use crate::packet_utils::Buf;
-use crate::{packet_processors, Bot, Compression, Error};
+use crate::{Bot, Compression, Error, packet_processors};
 use std::io::{ErrorKind, Read, Write};
 
 pub fn read_socket(bot: &mut Bot, packet: &mut Buf) -> bool {
@@ -71,77 +71,65 @@ pub fn process_packet(
         return;
     }
 
-    let mut next = 0;
-
     // Process all of the Minecraft packets received
     loop {
-        // Handle packet that have an incomplete size field
-        if packet_buf.get_writer_index() as u32 - next < 3 {
-            buffer(packet_buf, &mut bot.buffering_buf);
-            break;
-        }
+        let packet_start = packet_buf.get_reader_index();
 
         // Read packet size
-        let tuple = packet_buf.read_var_u32();
-        let size = tuple.0 as usize;
-        next += tuple.0 + tuple.1;
+        let size = packet_buf.read_var_i32() as usize;
 
-        // Skip packets of 0 length
+        let varint_len = packet_buf.get_reader_index() - packet_start;
+        let next = packet_start + varint_len + size as u32;
+
         if size == 0 {
             println!("0 len packet (shouldn't be possible)");
             continue;
         }
 
-        // Handle incomplete packet
-        if packet_buf.get_writer_index() < size as u32 + packet_buf.get_reader_index() {
-            packet_buf.set_reader_index(packet_buf.get_reader_index() - tuple.1);
+        // Handle incomplete packet body
+        if packet_buf.get_writer_index() < next {
+            packet_buf.set_reader_index(packet_start);
             buffer(packet_buf, &mut bot.buffering_buf);
             break;
         }
 
         // Decompress if needed and parse the packet
         if bot.compression_threshold > 0 {
-            let real_length_tuple = packet_buf.read_var_u32();
-            let real_length = real_length_tuple.0;
+            let data_len_start = packet_buf.get_reader_index();
+            let data_length = packet_buf.read_var_i32();
 
-            // Buffer is compressed
-            if real_length != 0 {
+            let data_len_bytes = (packet_buf.get_reader_index() - data_len_start) as usize;
+
+            if data_length != 0 {
                 decompression_buf.set_reader_index(0);
                 decompression_buf.set_writer_index(0);
 
-                {
-                    let start = packet_buf.get_reader_index() as usize;
-                    let end = packet_buf.get_reader_index() as usize + size
-                        - real_length_tuple.1 as usize;
+                let start = packet_buf.get_reader_index() as usize;
+                let end = start + size - data_len_bytes;
 
-                    if start > end {
-                        println!(
-                            "s {} > e {}, size: {}, tl: {}, ri: {}, wi: {}",
-                            start,
-                            end,
-                            size,
-                            real_length_tuple.1,
-                            packet_buf.get_reader_index(),
-                            packet_buf.get_writer_index()
-                        );
-                        bot.kicked = true;
-                        break;
-                    }
+                if start > end {
+                    println!(
+                        "Invalid range: s {}, e {}, size {}, dl_len {}, ri {}, wi {}",
+                        start,
+                        end,
+                        size,
+                        data_len_bytes,
+                        packet_buf.get_reader_index(),
+                        packet_buf.get_writer_index()
+                    );
+                    bot.kicked = true;
+                    break;
+                }
 
-                    // Decompress
-                    match decompress_packet(
-                        real_length,
-                        &packet_buf.buffer[start..end],
-                        compression,
-                        decompression_buf,
-                    ) {
-                        Ok(x) => x,
-                        Err(err) => {
-                            println!("decompression error: {}", err);
-                            bot.kicked = true;
-                            break;
-                        }
-                    };
+                if let Err(err) = decompress_packet(
+                    data_length as u32,
+                    &packet_buf.buffer[start..end],
+                    compression,
+                    decompression_buf,
+                ) {
+                    println!("decompression error: {}", err);
+                    bot.kicked = true;
+                    break;
                 }
 
                 packet_processors::process_decode(decompression_buf, bot, compression);
@@ -151,6 +139,7 @@ pub fn process_packet(
         } else {
             packet_processors::process_decode(packet_buf, bot, compression);
         }
+
         if bot.kicked {
             break;
         }

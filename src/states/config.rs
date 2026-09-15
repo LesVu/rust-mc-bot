@@ -1,4 +1,4 @@
-use crate::{packet_utils::Buf, Bot, Compression, ProtocolState};
+use crate::{Bot, Compression, ProtocolState, packet_utils::Buf};
 
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Cookie_Request_(configuration)
 pub fn process_cookie_request_packet(buf: &mut Buf, bot: &mut Bot, compression: &mut Compression) {
@@ -46,7 +46,10 @@ pub fn process_transfer(buffer: &mut Buf, bot: &mut Bot, _compression: &mut Comp
     let address = buffer.read_sized_string().to_owned();
     let port = buffer.read_u16();
 
-    println!("Server requested transfer to {address}:{port} but it isnt implemented! Please turn off online mode! Disconnecting bot {}", bot.name);
+    println!(
+        "Server requested transfer to {address}:{port} but it isnt implemented! Please turn off online mode! Disconnecting bot {}",
+        bot.name
+    );
     bot.kicked = true;
 }
 
@@ -103,7 +106,7 @@ pub fn write_acknowledge_resource_pack(id: u128) -> Buf {
     buf.write_packet_id(0x06);
 
     buf.write_u128(id);
-    buf.write_var_u32(3); // Accepted
+    buf.write_var_i32(3); // Accepted
 
     buf
 }
@@ -112,7 +115,7 @@ pub fn write_known_packets() -> Buf {
     let mut buf = Buf::new();
     buf.write_packet_id(0x07);
 
-    buf.write_var_u32(0);
+    buf.write_var_i32(0);
 
     buf
 }
@@ -129,19 +132,19 @@ pub fn write_client_settings() -> Buf {
     buf.write_sized_str("en_US");
 
     // view distance
-    buf.write_u8(VIEW_DISTANCE);
+    buf.write_byte(VIEW_DISTANCE);
 
     // chat mode
-    buf.write_var_u32(0);
+    buf.write_var_i32(0);
 
     // chat colors
     buf.write_bool(true);
 
     // skin flags
-    buf.write_u8(0xFF);
+    buf.write_byte(0xFF);
 
     // main hand
-    buf.write_var_u32(1);
+    buf.write_var_i32(1);
 
     // enable text filtering
     buf.write_bool(false);
@@ -150,7 +153,7 @@ pub fn write_client_settings() -> Buf {
     buf.write_bool(true);
 
     // particle status
-    buf.write_var_u32(0);
+    buf.write_var_i32(0);
 
     buf
 }

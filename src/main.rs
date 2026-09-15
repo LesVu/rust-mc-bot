@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 mod nets;
 mod packet_processors;
 mod packet_utils;
@@ -19,7 +22,7 @@ use uuid::Uuid;
 
 const SHOULD_MOVE: bool = true;
 
-const PROTOCOL_VERSION: u32 = 776;
+const PROTOCOL_VERSION: i32 = 776;
 const BOT_NAME: &str = "BooRE1";
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
