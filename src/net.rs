@@ -1,4 +1,4 @@
-use crate::packet_utils::Buf;
+use crate::buffer::Buf;
 use crate::{Bot, Compression, Error, packet_processors};
 use std::io::{ErrorKind, Read, Write};
 
@@ -159,10 +159,9 @@ impl Bot {
         }
         let mut packet = buf;
         if self.compression_threshold > 0 {
-            packet = packet_processors::PacketCompressor::process_write(packet, self, compression)
-                .unwrap();
+            packet = packet_processors::process_compress_write(packet, self, compression).unwrap();
         }
-        packet = packet_processors::PacketFramer::process_write(packet);
+        packet = packet_processors::process_write(packet);
         match self.stream.write_all(
             &packet.buffer[packet.get_reader_index() as usize..packet.get_writer_index() as usize],
         ) {

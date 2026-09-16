@@ -1,4 +1,4 @@
-use crate::{Bot, Compression, ProtocolState, packet_utils::Buf};
+use crate::{Bot, Compression, ProtocolState, buffer::Buf};
 
 /// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Cookie_Request_(configuration)
 pub fn process_cookie_request_packet(buf: &mut Buf, bot: &mut Bot, compression: &mut Compression) {

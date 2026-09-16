@@ -1,4 +1,5 @@
-use crate::packet_utils::Buf;
+use crate::buffer::Buf;
+use crate::data::slot::ItemStack;
 use crate::{Bot, Compression};
 
 /// Clientbound Keep Alive (play)
@@ -163,4 +164,70 @@ pub fn write_pos(x: f64, y: f64, z: f64, yaw: f32, pitch: f32) -> Buf {
     buf.write_bool(false);
 
     buf
+}
+
+/// Set Container Content
+/// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Set_Container_Content
+pub fn process_set_container_content(
+    buffer: &mut Buf,
+    bot: &mut Bot,
+    _compression: &mut Compression,
+) {
+    // id 0 is player inventory
+    let window_id = buffer.read_var_i32();
+    // need to send back
+    let state_id = buffer.read_var_i32();
+    let slot_data = buffer.read_slot_array();
+    let carry_item = buffer.read_slot();
+
+    bot.state_id = state_id;
+    bot.inventory = slot_data.clone();
+
+    println!(
+        "debug: window id: {}, state_id:{}, slot data:{:?}, carry item: {:?}",
+        window_id, state_id, &slot_data, carry_item
+    )
+}
+
+/// Click Container
+/// https://minecraft.wiki/w/Java_Edition_protocol/Packets#Click_Container
+pub fn click_container(
+    bot: &mut Bot,
+    window_id: i32,
+    slot_number: i32,
+    slot: ItemStack,
+    compression: &mut Compression,
+) {
+    let mut buf = Buf::new();
+
+    buf.write_packet_id(0x12);
+    buf.write_var_i32(window_id);
+    buf.write_var_i32(bot.state_id);
+    buf.write_u16(slot_number as u16); // Clicked slot index
+    buf.write_byte(0); // Button: 0 (Left click)
+    buf.write_var_i32(0); // Mode: 0 (Normal pickup / place)
+
+    // Prefix Array (length = 1)
+    buf.write_var_i32(1);
+    buf.write_u16(slot_number as u16);
+    buf.write_bool(false);
+
+    // Carried Item (cursor holds the stack now)
+    buf.write_bool(true);
+    buf.write_var_i32(slot.item_id);
+    buf.write_var_i32(slot.count);
+    // Components to add
+    buf.write_var_i32(slot.components_to_add.len() as i32);
+    for comp in &slot.components_to_add {
+        buf.write_var_i32(comp.component_type);
+        buf.write_bytes(&comp.raw_data);
+    }
+
+    // Components to remove
+    buf.write_var_i32(slot.components_to_remove.len() as i32);
+    for &type_id in &slot.components_to_remove {
+        buf.write_var_i32(type_id);
+    }
+
+    bot.send_packet(buf, compression);
 }

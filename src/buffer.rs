@@ -1,3 +1,4 @@
+use crate::data::slot::{DataComponent, ItemStack, Slot};
 use std::convert::TryInto;
 use std::io::Write;
 use std::ptr::copy_nonoverlapping;
@@ -407,6 +408,89 @@ impl Buf {
             }
         }
         result as i64
+    }
+}
+
+impl Buf {
+    pub fn write_slot(&mut self, slot: Option<&ItemStack>) {
+        match slot {
+            None => {
+                // Count <= 0 represents an empty slot
+                self.write_var_i32(0);
+            }
+            Some(item) => {
+                self.write_var_i32(item.count);
+                self.write_var_i32(item.item_id);
+
+                // Components to add
+                self.write_var_i32(item.components_to_add.len() as i32);
+                for comp in &item.components_to_add {
+                    self.write_var_i32(comp.component_type);
+                    self.write_bytes(&comp.raw_data);
+                }
+
+                // Components to remove
+                self.write_var_i32(item.components_to_remove.len() as i32);
+                for &type_id in &item.components_to_remove {
+                    self.write_var_i32(type_id);
+                }
+            }
+        }
+    }
+
+    pub fn read_slot(&mut self) -> Slot {
+        let count = self.read_var_i32();
+        if count <= 0 {
+            return None;
+        }
+
+        let item_id = self.read_var_i32();
+
+        // Components to add
+        let add_len = self.read_var_i32() as usize;
+        let mut components_to_add = Vec::with_capacity(add_len);
+        for _ in 0..add_len {
+            let component_type = self.read_var_i32();
+            // Component payloads are type-specific. If reading untyped raw bytes,
+            // you must look up or parse the specific component codec.
+            components_to_add.push(DataComponent {
+                component_type,
+                raw_data: Vec::new(),
+            });
+        }
+
+        // Components to remove
+        let remove_len = self.read_var_i32() as usize;
+        let mut components_to_remove = Vec::with_capacity(remove_len);
+        for _ in 0..remove_len {
+            components_to_remove.push(self.read_var_i32());
+        }
+
+        Some(ItemStack {
+            count,
+            item_id,
+            components_to_add,
+            components_to_remove,
+        })
+    }
+
+    // Prefixed Array of Slot: VarInt length + consecutive Slot entries
+    pub fn write_slot_array(&mut self, slots: &[Slot]) {
+        self.write_var_i32(slots.len() as i32);
+        for slot in slots {
+            self.write_slot(slot.as_ref());
+        }
+    }
+
+    pub fn read_slot_array(&mut self) -> Vec<Slot> {
+        let count = self.read_var_i32() as usize;
+        let mut slots = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            slots.push(self.read_slot());
+        }
+
+        slots
     }
 }
 

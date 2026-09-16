@@ -1,14 +1,10 @@
 use libdeflater::Compressor;
 
-use crate::packet_utils::Buf;
+use crate::buffer::Buf;
 use crate::states::{config, login, play, status};
 use crate::{Bot, Compression, Error, ProtocolState};
 
 pub type PacketHandler = fn(buffer: &mut Buf, bot: &mut Bot, compression: &mut Compression);
-
-pub struct PacketFramer {}
-
-pub struct PacketCompressor {}
 
 pub fn lookup_packet(state: ProtocolState, packet: u8) -> Option<PacketHandler> {
     match state {
@@ -41,6 +37,7 @@ pub fn lookup_packet(state: ProtocolState, packet: u8) -> Option<PacketHandler> 
         },
 
         ProtocolState::Play => match packet {
+            0x12 => return Some(play::process_set_container_content),
             0x15 => return Some(config::process_cookie_request_packet),
             0x20 => return Some(play::process_kick),
             0x2C => return Some(play::process_keep_alive_packet),
@@ -63,36 +60,32 @@ pub fn process_decode(
     Some(())
 }
 
-impl PacketFramer {
-    pub fn process_write(buffer: Buf) -> Buf {
-        let size = buffer.get_writer_index();
-        let header_size = Buf::get_var_u32_size(size);
-        if header_size > 3 {
-            panic!("header_size > 3")
-        }
-        let mut target = Buf::with_length(size + header_size);
-        target.write_var_i32(size as i32);
-        target.append(&buffer, buffer.get_writer_index() as usize);
-        target
+pub fn process_write(buffer: Buf) -> Buf {
+    let size = buffer.get_writer_index();
+    let header_size = Buf::get_var_u32_size(size);
+    if header_size > 3 {
+        panic!("header_size > 3")
     }
+    let mut target = Buf::with_length(size + header_size);
+    target.write_var_i32(size as i32);
+    target.append(&buffer, buffer.get_writer_index() as usize);
+    target
 }
 
-impl PacketCompressor {
-    pub fn process_write(
-        buffer: Buf,
-        bot: &Bot,
-        compression: &mut Compression,
-    ) -> Result<Buf, Error> {
-        if buffer.get_writer_index() as i32 > bot.compression_threshold {
-            let mut buf = Buf::new();
-            compress_packet(&buffer, &mut compression.compressor, &mut buf)?;
-            Ok(buf)
-        } else {
-            let mut buf = Buf::new();
-            buf.write_var_i32(0);
-            buf.append(&buffer, buffer.get_writer_index() as usize);
-            Ok(buf)
-        }
+pub fn process_compress_write(
+    buffer: Buf,
+    bot: &Bot,
+    compression: &mut Compression,
+) -> Result<Buf, Error> {
+    if buffer.get_writer_index() as i32 > bot.compression_threshold {
+        let mut buf = Buf::new();
+        compress_packet(&buffer, &mut compression.compressor, &mut buf)?;
+        Ok(buf)
+    } else {
+        let mut buf = Buf::new();
+        buf.write_var_i32(0);
+        buf.append(&buffer, buffer.get_writer_index() as usize);
+        Ok(buf)
     }
 }
 

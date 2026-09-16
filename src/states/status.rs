@@ -1,4 +1,4 @@
-use crate::packet_utils::Buf;
+use crate::buffer::Buf;
 use crate::{Bot, Compression};
 
 /// Status Response

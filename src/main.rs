@@ -1,13 +1,14 @@
 #[cfg(test)]
 mod test;
 
-mod nets;
+mod buffer;
+mod data;
+mod net;
 mod packet_processors;
-mod packet_utils;
 mod states;
 
-use crate::nets::stream::Stream;
-use crate::packet_utils::Buf;
+use crate::buffer::Buf;
+use crate::data::bot::Bot;
 use crate::states::login;
 use libdeflater::{CompressionLvl, Compressor, Decompressor};
 use mio::net::TcpStream;
@@ -55,7 +56,7 @@ fn main() -> io::Result<()> {
             .next()
             .expect("No socket address found");
 
-        addrs = Some(Address::new(server));
+        addrs = Some(server);
     }
 
     // Cant be none because it would have panicked earlier
@@ -71,23 +72,6 @@ pub struct Compression {
     decompressor: Decompressor,
 }
 
-pub struct Bot {
-    pub token: Token,
-    pub stream: Stream,
-    pub name: String,
-    pub id: u32,
-    pub entity_id: u32,
-    pub compression_threshold: i32,
-    pub state: ProtocolState,
-    pub kicked: bool,
-    pub teleported: bool,
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-    pub buffering_buf: Buf,
-    pub joined: bool,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum ProtocolState {
     Status,
@@ -96,16 +80,17 @@ pub enum ProtocolState {
     Play,
 }
 
-pub fn start_bot(addrs: Address, name: String) {
+pub fn start_bot(addr: SocketAddr, name: String) {
     let mut poll = Poll::new().expect("could not unwrap poll");
     let mut events = Events::with_capacity(16);
 
-    println!("{:?}", addrs);
+    println!("{:?}", addr);
+    let stream = TcpStream::connect(addr).expect("Could not connect to the server");
 
     let token = Token(0);
     let mut bot = Bot {
         token,
-        stream: addrs.connect(),
+        stream,
         name,
         id: 0,
         entity_id: 0,
@@ -118,6 +103,8 @@ pub fn start_bot(addrs: Address, name: String) {
         z: 0.0,
         buffering_buf: Buf::with_length(200),
         joined: false,
+        state_id: 0,
+        inventory: vec![],
     };
 
     poll.registry()
@@ -147,7 +134,7 @@ pub fn start_bot(addrs: Address, name: String) {
                 bot.joined = true;
 
                 // socket ops
-                bot.stream.set_ops();
+                bot.stream.set_nodelay(true).unwrap();
 
                 //login sequence
                 let buf = login::write_handshake_packet(PROTOCOL_VERSION, "".to_string(), 0, 2);
@@ -161,7 +148,7 @@ pub fn start_bot(addrs: Address, name: String) {
             }
 
             if event.is_readable() && bot.joined {
-                nets::net::process_packet(
+                net::process_packet(
                     &mut bot,
                     &mut packet_buf,
                     &mut uncompressed_buf,
@@ -176,40 +163,28 @@ pub fn start_bot(addrs: Address, name: String) {
         }
 
         // Ticking actions
-        if SHOULD_MOVE && bot.teleported {
-            // bot.x += rand::random::<f64>() * 1.0 - 0.5;
-            // bot.z += rand::random::<f64>() * 1.0 - 0.5;
-            // bot.send_packet(play::write_current_pos(&bot), &mut compression);
+        // if SHOULD_MOVE && bot.teleported {
+        //     // bot.x += rand::random::<f64>() * 1.0 - 0.5;
+        //     // bot.z += rand::random::<f64>() * 1.0 - 0.5;
+        //     // bot.send_packet(play::write_current_pos(&bot), &mut compression);
 
-            // Sneak (0x20 = Shift / Sneak flag)
-            bot.send_packet(play::write_player_input(0x20), &mut compression);
-            println!("Sneaking");
+        //     // // Sneak (0x20 = Shift / Sneak flag)
+        //     // bot.send_packet(play::write_player_input(0x20), &mut compression);
+        //     // println!("Sneaking");
 
-            // Hold for 1 second
-            std::thread::sleep(Duration::from_secs(2));
+        //     // // Hold for 1 second
+        //     // std::thread::sleep(Duration::from_secs(2));
 
-            // Unsneak (clear sneak flag)
-            bot.send_packet(play::write_player_input(0x00), &mut compression);
-            println!("Un Sneak");
-            // Hold for 1 second
-            std::thread::sleep(Duration::from_secs(2));
-        }
+        //     // // Unsneak (clear sneak flag)
+        //     // bot.send_packet(play::write_player_input(0x00), &mut compression);
+        //     // println!("Un Sneak");
+        //     // // Hold for 1 second
+        //     // std::thread::sleep(Duration::from_secs(2));
+        // }
 
         let elapsed = ins.elapsed();
         if elapsed < dur {
             std::thread::sleep(dur - elapsed);
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Address(SocketAddr);
-
-impl Address {
-    pub fn new(addr: SocketAddr) -> Self {
-        Self(addr)
-    }
-    pub fn connect(&self) -> Stream {
-        Stream::new(TcpStream::connect(self.0.to_owned()).expect("Could not connect to the server"))
     }
 }

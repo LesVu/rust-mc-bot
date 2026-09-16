@@ -1,5 +1,5 @@
 use crate::{Bot, Compression, ProtocolState};
-use crate::{packet_utils::Buf, states::config};
+use crate::{buffer::Buf, states::config};
 
 //c2s
 
